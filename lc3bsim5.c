@@ -1,6 +1,6 @@
 /*
-    Name 1: Your Name
-    UTEID 1: Your UTEID
+    Name 1: Paul Han
+    UTEID 1: pjh2235
 */
 
 /***************************************************************/
@@ -65,11 +65,17 @@ enum CS_BITS {
     LD_REG,
     LD_CC,
     LD_PC,
+    LD_VECTOR,
+    LD_PSR,
+    LD_SP,
     GATE_PC,
     GATE_MDR,
     GATE_ALU,
     GATE_MARMUX,
     GATE_SHF,
+    GATE_VECTOR,
+    GATE_PSR,
+    GATE_SP,
     PCMUX1, PCMUX0,
     DRMUX,
     SR1MUX,
@@ -81,6 +87,10 @@ enum CS_BITS {
     R_W,
     DATA_SIZE,
     LSHF1,
+    SW_SSP,
+    SW_USP,
+    SP_MUX,
+    CLR_PSR,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
