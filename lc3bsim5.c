@@ -110,11 +110,17 @@ int GetLD_BEN(int *x)        { return(x[LD_BEN]); }
 int GetLD_REG(int *x)        { return(x[LD_REG]); }
 int GetLD_CC(int *x)         { return(x[LD_CC]); }
 int GetLD_PC(int *x)         { return(x[LD_PC]); }
+int GetLD_VECTOR(int *x)     { return(x[LD_VECTOR]);}
+int GetLD_PSR(int *x)        { return(x[LD_PSR]);}
+int GetLD_SP(int *x)         { return(x[LD_SP]);}
 int GetGATE_PC(int *x)       { return(x[GATE_PC]); }
 int GetGATE_MDR(int *x)      { return(x[GATE_MDR]); }
 int GetGATE_ALU(int *x)      { return(x[GATE_ALU]); }
 int GetGATE_MARMUX(int *x)   { return(x[GATE_MARMUX]); }
 int GetGATE_SHF(int *x)      { return(x[GATE_SHF]); }
+int GetGATE_VECTOR(int *x)   { return(x[GATE_VECTOR]);}
+int GetGATE_PSR(int *x)      { return(x[GATE_PSR]);}
+int GetGATE_SP(int *x)       { return(x[GATE_SP]);}
 int GetPCMUX(int *x)         { return((x[PCMUX1] << 1) + x[PCMUX0]); }
 int GetDRMUX(int *x)         { return(x[DRMUX]); }
 int GetSR1MUX(int *x)        { return(x[SR1MUX]); }
@@ -126,6 +132,10 @@ int GetMIO_EN(int *x)        { return(x[MIO_EN]); }
 int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
+int GetSW_SSP(int *x)        { return(x[SW_SSP]);}
+int GetSW_USP(int *x)        { return(x[SW_USP]);}
+int GetSP_MUX(int *x)        { return(x[SP_MUX]);}
+int GetCLR_PSR(int *x)       { return(x[CLR_PSR]);}
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -183,6 +193,8 @@ int STATE_NUMBER; /* Current State Number - Provided for debugging */
 int INTV; /* Interrupt vector register */
 int EXCV; /* Exception vector register */
 int SSP; /* Initial value of system stack pointer */
+int USP; /* Initial value of user stack pointer */
+int PSR; /* Processor Status Register */
 /* MODIFY: you should add here any other registers you need to implement interrupts and exceptions */
 
 /* For lab 5 */
@@ -232,16 +244,18 @@ void help() {
 /*                                                             */
 /***************************************************************/
 void cycle() {                                                
+    if(CYCLE_COUNT == 300){
+        NEXT_LATCHES.INTV = 0x01;
+    }
+    eval_micro_sequencer();   
+    cycle_memory();
+    eval_bus_drivers();
+    drive_bus();
+    latch_datapath_values();
 
-  eval_micro_sequencer();   
-  cycle_memory();
-  eval_bus_drivers();
-  drive_bus();
-  latch_datapath_values();
+    CURRENT_LATCHES = NEXT_LATCHES;
 
-  CURRENT_LATCHES = NEXT_LATCHES;
-
-  CYCLE_COUNT++;
+    CYCLE_COUNT++;
 }
 
 /***************************************************************/
