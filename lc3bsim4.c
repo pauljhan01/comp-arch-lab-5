@@ -866,7 +866,14 @@ void eval_bus_drivers() {
                     }
                 }
             }
-            if(((addr1_result + addr2_result) & 0x01) == 1 && GetLSHF1(CURRENT_LATCHES.MICROINSTRUCTION)==1){
+            if((addr1_result + addr2_result) < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+                exception_or_interrupt_skip = TRUE;
+                exceptions = TRUE;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 36;
+                copy_microinstruction();
+            }
+            else if(((addr1_result + addr2_result) & 0x01) == 1 && GetLSHF1(CURRENT_LATCHES.MICROINSTRUCTION)==1){
                 exception_or_interrupt_skip = TRUE;
                 exceptions = TRUE;
                 NEXT_LATCHES.EXCV = 0x03;
@@ -1195,6 +1202,7 @@ void drive_bus() {
             }
         }
     }
+    
 }
 
   /* 
@@ -1263,6 +1271,13 @@ void latch_datapath_values() {
                 addr1 = CURRENT_LATCHES.REGS[reg_idx];
             }
             NEXT_LATCHES.PC = Low16bits(addr1 + addr2);
+            if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+                exceptions = TRUE;
+                exception_or_interrupt_skip = TRUE;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 36;
+                copy_microinstruction();
+            } 
         }
     }
     load_signals[ldpc] = FALSE;
