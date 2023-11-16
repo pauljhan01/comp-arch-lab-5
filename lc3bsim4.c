@@ -1236,6 +1236,13 @@ void latch_datapath_values() {
         if(GetPCMUX(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             int reg_idx = (CURRENT_LATCHES.IR & 0x01C0) >> 6;
             NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[reg_idx];
+            if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+                exceptions = TRUE;
+                exception_or_interrupt_skip = TRUE;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 36;
+                copy_microinstruction();
+            } 
         }
         if(GetPCMUX(CURRENT_LATCHES.MICROINSTRUCTION)==2){ 
             int addr2 = 0;
