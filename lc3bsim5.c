@@ -908,6 +908,7 @@ void eval_bus_drivers() {
                     }
                 }
             }
+            //protection exception -> needs to be changed for Lab 5
             if((addr1_result + addr2_result) < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
                 exception_or_interrupt_skip = TRUE;
                 exceptions = TRUE;
@@ -915,6 +916,7 @@ void eval_bus_drivers() {
                 NEXT_LATCHES.STATE_NUMBER = 36;
                 copy_microinstruction();
             }
+            //unaligned exception
             else if(((addr1_result + addr2_result) & 0x01) == 1 && GetLSHF1(CURRENT_LATCHES.MICROINSTRUCTION)==1){
                 exception_or_interrupt_skip = TRUE;
                 exceptions = TRUE;
@@ -1164,7 +1166,7 @@ void drive_bus() {
                 NEXT_LATCHES.STATE_NUMBER = 37;
                 copy_microinstruction();
             }
-            //protection exception
+            //protection exception -> needs to be changed for Lab 5
             if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && NEXT_LATCHES.MAR < 0x3000 && (NEXT_LATCHES.IR & 0xFF00) != 0xFF00){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
@@ -1218,7 +1220,7 @@ void drive_bus() {
         if(GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             NEXT_LATCHES.MAR = Low16bits(BUS);
             load_signals[ldmar] = TRUE;
-            //protection exception
+            //protection exception -> needs to be changed for Lab 5
             if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && NEXT_LATCHES.MAR < 0x3000 && (NEXT_LATCHES.IR & 0xFF00)!=0xF000){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
@@ -1277,6 +1279,7 @@ void latch_datapath_values() {
         if(GetPCMUX(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             int reg_idx = (CURRENT_LATCHES.IR & 0x01C0) >> 6;
             NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[reg_idx];
+            //protection exception -> needs to be changed
             if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
@@ -1319,6 +1322,7 @@ void latch_datapath_values() {
                 addr1 = CURRENT_LATCHES.REGS[reg_idx];
             }
             NEXT_LATCHES.PC = Low16bits(addr1 + addr2);
+            //protection exception
             if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;

@@ -20,9 +20,7 @@ LEA R0, Complete
 LDW R0, R0, #0
 STW R3, R0, #0 ;Mem[xC014] = Sum of the 20 bytes
 
-LEA R0, Unaligned
-LDW R0, R0, #0
-STW R3, R0, #0 
+JMP R3
 
 Initial .FILL x4000
 Begin .FILL xC000
