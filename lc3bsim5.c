@@ -68,6 +68,12 @@ enum CS_BITS {
     LD_VECTOR,
     LD_PSR,
     LD_SP,
+    LD_MODIFIED,
+    LD_TRAP,
+    LD_STATE,
+    LD_MARVA,
+    LD_MARPA,
+    LD_VA,
     GATE_PC,
     GATE_MDR,
     GATE_ALU,
@@ -91,6 +97,7 @@ enum CS_BITS {
     SW_USP,
     SP_MUX,
     CLR_PSR,
+    PTE_BITS,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -113,6 +120,12 @@ int GetLD_PC(int *x)         { return(x[LD_PC]); }
 int GetLD_VECTOR(int *x)     { return(x[LD_VECTOR]);}
 int GetLD_PSR(int *x)        { return(x[LD_PSR]);}
 int GetLD_SP(int *x)         { return(x[LD_SP]);}
+int GetLD_MODIFIED(int *x)   { return(x[LD_MODIFIED]);}
+int GetLD_TRAP(int *x)       { return(x[LD_TRAP]);}
+int GetLD_STATE(int *x)      { return(x[LD_STATE]);}
+int GetLD_MARVA(int *x)      { return(x[LD_MARVA]);}
+int GetLD_MARPA(int *x)      { return(x[LD_MARPA]);}
+int GetLD_VA(int *x)         { return(x[LD_VA]);}
 int GetGATE_PC(int *x)       { return(x[GATE_PC]); }
 int GetGATE_MDR(int *x)      { return(x[GATE_MDR]); }
 int GetGATE_ALU(int *x)      { return(x[GATE_ALU]); }
@@ -136,6 +149,7 @@ int GetSW_SSP(int *x)        { return(x[SW_SSP]);}
 int GetSW_USP(int *x)        { return(x[SW_USP]);}
 int GetSP_MUX(int *x)        { return(x[SP_MUX]);}
 int GetCLR_PSR(int *x)       { return(x[CLR_PSR]);}
+int GetPTE_BIT(int *x)       { return(x[PTE_BITS]);}
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -201,6 +215,9 @@ int PSR; /* Processor Status Register */
 int PTBR; /* This is initialized when we load the page table */
 int VA;   /* Temporary VA register */
 /* MODIFY: you should add here any other registers you need to implement virtual memory */
+int MODIFIED; /* To know if the modified bit should be set or not */
+int TRAP; /* To know if a TRAP instruction is being executed*/
+int NEXT_STATE; /* To know the next state that the micro sequencer should go to after completing translation */
 
 } System_Latches;
 
@@ -651,6 +668,7 @@ int main(int argc, char *argv[]) {
 /***************************************************************/
 int interrupts = FALSE;
 int exceptions = FALSE;
+int VPN_MASK = 0xFE00;
 int exception_or_interrupt_skip = FALSE;
 #define READ 0
 #define WRITE 1
@@ -861,6 +879,7 @@ void eval_bus_drivers() {
             immediate = CURRENT_LATCHES.IR & 0x00FF;
             immediate = immediate << 1;
             BUS = Low16bits(immediate);
+            NEXT_LATCHES.TRAP == TRUE;
         }
         else{
             __int16_t addr2_result = 0;
@@ -909,7 +928,8 @@ void eval_bus_drivers() {
                 }
             }
             //protection exception -> needs to be changed for Lab 5
-            if((addr1_result + addr2_result) < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+            // Frames 0-23 are directly mapped to Pages 0-23 
+            if((((addr1_result + addr2_result) & 0xFE00) >> 9) <= 23 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000 && CURRENT_LATCHES.TRAP == FALSE){
                 exception_or_interrupt_skip = TRUE;
                 exceptions = TRUE;
                 NEXT_LATCHES.EXCV = 0x02;
@@ -1159,6 +1179,7 @@ void drive_bus() {
         }
         if(GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             NEXT_LATCHES.MAR = Low16bits(BUS);
+            NEXT_LATCHES.NEXT_STATE = NEXT_LATCHES.STATE_NUMBER;
             load_signals[ldmar] = TRUE;
             if(NEXT_LATCHES.INTV!=0){
                 interrupts = TRUE;
@@ -1166,8 +1187,13 @@ void drive_bus() {
                 NEXT_LATCHES.STATE_NUMBER = 37;
                 copy_microinstruction();
             }
+            //address translation required
+            if((NEXT_LATCHES.MAR & 0xFE00)>>9 < 23){
+                NEXT_LATCHES.STATE_NUMBER = 53;
+                copy_microinstruction();
+            }
             //protection exception -> needs to be changed for Lab 5
-            if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && NEXT_LATCHES.MAR < 0x3000 && (NEXT_LATCHES.IR & 0xFF00) != 0xFF00){
+            if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && ((NEXT_LATCHES.MAR & 0xFE00)>>9) <= 23 && (NEXT_LATCHES.IR & 0xFF00) != 0xFF00 && CURRENT_LATCHES.TRAP == FALSE){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
                 NEXT_LATCHES.EXCV = 0x02;
@@ -1212,6 +1238,7 @@ void drive_bus() {
                 NEXT_LATCHES.REGS[reg_idx] = Low16bits(BUS);
             }else{
                 NEXT_LATCHES.REGS[7] = Low16bits(BUS);
+                NEXT_LATCHES.TRAP == FALSE;
             }
             load_signals[ldreg] = TRUE;
         }
@@ -1219,9 +1246,18 @@ void drive_bus() {
     else if(GetGATE_MARMUX(CURRENT_LATCHES.MICROINSTRUCTION)==1){
         if(GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             NEXT_LATCHES.MAR = Low16bits(BUS);
+            NEXT_LATCHES.NEXT_STATE = NEXT_LATCHES.STATE_NUMBER;
             load_signals[ldmar] = TRUE;
-            //protection exception -> needs to be changed for Lab 5
-            if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && NEXT_LATCHES.MAR < 0x3000 && (NEXT_LATCHES.IR & 0xFF00)!=0xF000){
+            if((CURRENT_LATCHES.IR & 0xF000) == 0x7000 || (CURRENT_LATCHES.IR & 0xF000) == 0x3000){
+                NEXT_LATCHES.MODIFIED = TRUE;
+            }
+            //begin address translation
+            if(((NEXT_LATCHES.MAR & 0xFE00)>>9) < 23){
+                NEXT_LATCHES.STATE_NUMBER = 53;
+                copy_microinstruction();
+            }
+            //protection exception
+            if((NEXT_LATCHES.PSR & 0x8000)==0x8000 && ((NEXT_LATCHES.MAR & 0xFE00)>>9) <= 23 && (NEXT_LATCHES.IR & 0xFF00)!=0xF000){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
                 NEXT_LATCHES.EXCV = 0x02;
@@ -1260,6 +1296,47 @@ void latch_datapath_values() {
         exception_or_interrupt_skip = FALSE;
         return;
     }
+    if(GetLD_VA(CURRENT_LATCHES.MICROINSTRUCTION)){
+        NEXT_LATCHES.VA = Low16bits(CURRENT_LATCHES.MAR);
+    }
+    if(GetLD_MARVA(CURRENT_LATCHES.MICROINSTRUCTION)){
+        int offset = (NEXT_LATCHES.VA & 0x0000FE00) << 1; //LSHF(VA[15:9],1)
+        NEXT_LATCHES.MAR = Low16bits(0x10 + offset);
+    }
+    if(GetPTE_BIT(CURRENT_LATCHES.MICROINSTRUCTION)){
+        //protection exception
+        if(CURRENT_LATCHES.TRAP == FALSE
+        && (CURRENT_LATCHES.MDR & 0x0008) == 0x0008
+        && (CURRENT_LATCHES.PSR & 0x8000) == 0x8000){
+                exceptions = TRUE;
+                exception_or_interrupt_skip = TRUE;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 36;
+                copy_microinstruction();
+                NEXT_LATCHES.MODIFIED = FALSE;
+                return;
+        }
+        //Page fault
+        else if(CURRENT_LATCHES.MDR & 0x0004){
+                exceptions = TRUE;
+                exception_or_interrupt_skip = TRUE;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 36;
+                copy_microinstruction();
+                NEXT_LATCHES.MODIFIED = FALSE;
+                return;
+        }
+        NEXT_LATCHES.MDR = NEXT_LATCHES.MDR | 0x0001; //set reference bit
+        if(CURRENT_LATCHES.MODIFIED){
+            NEXT_LATCHES.MDR = NEXT_LATCHES.MDR | 0x0002; //set modified bit
+        }
+        NEXT_LATCHES.MODIFIED = FALSE;
+    }
+    if(GetLD_MARPA(CURRENT_LATCHES.MICROINSTRUCTION)){
+        int offset = (CURRENT_LATCHES.VA & 0x000001FF);
+        int temp = (CURRENT_LATCHES.MDR & 0x00003E00);
+        NEXT_LATCHES.MAR = Low16bits(temp + offset);
+    }
     if(GetSW_SSP(CURRENT_LATCHES.MICROINSTRUCTION)){
         NEXT_LATCHES.USP = Low16bits(CURRENT_LATCHES.REGS[6]);
         NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.SSP);
@@ -1279,8 +1356,8 @@ void latch_datapath_values() {
         if(GetPCMUX(CURRENT_LATCHES.MICROINSTRUCTION)==1){
             int reg_idx = (CURRENT_LATCHES.IR & 0x01C0) >> 6;
             NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[reg_idx];
-            //protection exception -> needs to be changed
-            if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+            //protection exception, if virtual address VA[15:9] <= 23 then trigger exception
+            if(((NEXT_LATCHES.PC & 0xFE00)>>9) <= 23 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000 && CURRENT_LATCHES.TRAP == FALSE){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
                 NEXT_LATCHES.EXCV = 0x02;
@@ -1323,7 +1400,7 @@ void latch_datapath_values() {
             }
             NEXT_LATCHES.PC = Low16bits(addr1 + addr2);
             //protection exception
-            if(NEXT_LATCHES.PC < 0x3000 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000){
+            if(((NEXT_LATCHES.PC & 0xFE00)>>9) <= 23 && (NEXT_LATCHES.PSR & 0x8000) == 0x8000 && CURRENT_LATCHES.TRAP == FALSE){
                 exceptions = TRUE;
                 exception_or_interrupt_skip = TRUE;
                 NEXT_LATCHES.EXCV = 0x02;
